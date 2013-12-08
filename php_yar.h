@@ -37,7 +37,7 @@ extern zend_module_entry yar_module_entry;
 #include "TSRM.h"
 #endif
 
-#define YAR_VERSION  "1.2.0-dev"
+#define PHP_YAR_VERSION  "1.2.2-dev"
 
 PHP_MINIT_FUNCTION(yar);
 PHP_MSHUTDOWN_FUNCTION(yar);
@@ -52,6 +52,7 @@ ZEND_BEGIN_MODULE_GLOBALS(yar)
     struct _yar_transport *transport;
     struct _yar_request *request;
     struct _yar_response *response;
+	char *content_type;
 	zend_bool debug;
 	zend_bool expose_info;
 	zend_bool allow_persistent;

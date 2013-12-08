@@ -271,16 +271,15 @@ regular_link:
 		curl_easy_setopt(cp, CURLOPT_IGNORE_CONTENT_LENGTH, 1);
 	}
 
-#if LIBCURL_VERSION_NUM > 0x071002 && 0
-	/* we don't really need MS time out */
-	curl_easy_setopt(cp, CURLOPT_CONNECTTIMEOUT_MS, YAR_G(connect_timeout) * 1000);
+#if LIBCURL_VERSION_NUM > 0x071002
+	curl_easy_setopt(cp, CURLOPT_CONNECTTIMEOUT_MS, YAR_G(connect_timeout));
 #else
-	curl_easy_setopt(cp, CURLOPT_CONNECTTIMEOUT, YAR_G(connect_timeout));
+	curl_easy_setopt(cp, CURLOPT_CONNECTTIMEOUT, (ulong)(YAR_G(connect_timeout) / 1000));
 #endif
 #if LIBCURL_VERSION_NUM > 0x071002
-	curl_easy_setopt(cp, CURLOPT_TIMEOUT_MS, YAR_G(timeout) * 1000);
+	curl_easy_setopt(cp, CURLOPT_TIMEOUT_MS, YAR_G(timeout));
 #else
-	curl_easy_setopt(cp, CURLOPT_TIMEOUT, YAR_G(timeout));
+	curl_easy_setopt(cp, CURLOPT_TIMEOUT, (ulong)(YAR_G(timeout) / 1000));
 #endif
 
 #if LIBCURL_VERSION_NUM >= 0x071100
@@ -418,7 +417,6 @@ yar_response_t * php_yar_curl_exec(yar_transport_interface_t* self, yar_request_
 } /* }}} */
 
 int php_yar_curl_send(yar_transport_interface_t* self, yar_request_t *request, char **msg TSRMLS_DC) /* {{{ */ {
-	CURL *cp;
 	zval *payload;
 	yar_header_t header = {0};
 	yar_curl_data_t *data = (yar_curl_data_t *)self->data;
@@ -432,7 +430,6 @@ int php_yar_curl_send(yar_transport_interface_t* self, yar_request_t *request, c
 
 	php_yar_protocol_render(&header, request->id, data->host->user, data->host->pass, Z_STRLEN_P(payload), 0 TSRMLS_CC);
 
-	cp = data->cp;
 	smart_str_appendl(&data->postfield, (char *)&header, sizeof(yar_header_t));
 	smart_str_appendl(&data->postfield, Z_STRVAL_P(payload), Z_STRLEN_P(payload));
 	zval_ptr_dtor(&payload);
@@ -462,14 +459,15 @@ int php_yar_curl_setopt(yar_transport_interface_t* self, long type, void *value,
 
 yar_transport_interface_t * php_yar_curl_init(TSRMLS_D) /* {{{ */ {
 	size_t newlen;
+	char content_type[512];
 	yar_curl_data_t *data;
 	yar_transport_interface_t *self;
 
 	self = ecalloc(1, sizeof(yar_transport_interface_t));
 	self->data = data = ecalloc(1, sizeof(yar_curl_data_t));
 
-	data->headers = curl_slist_append(data->headers, "Content-Type: application/octet-stream");
-	data->headers = curl_slist_append(data->headers, "User-Agent: PHP Yar Rpc-" YAR_VERSION);
+	snprintf(content_type, sizeof(content_type), "Content-Type: %s", YAR_G(content_type));
+	data->headers = curl_slist_append(data->headers, "User-Agent: PHP Yar Rpc-" PHP_YAR_VERSION);
 	data->headers = curl_slist_append(data->headers, "Expect:");
 
 	self->open   	= php_yar_curl_open;
@@ -695,7 +693,7 @@ int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurren
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "epoll_wait error '%s'", strerror(errno));
 				goto onerror;
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "epoll_wait timeout '%d' seconds reached", YAR_G(timeout)); 
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "epoll_wait timeout %ldms reached", YAR_G(timeout)); 
 				goto onerror;
 			}
 #else
@@ -705,14 +703,18 @@ int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurren
 			fd_set writefds;
 			fd_set exceptfds;
 
-			tv.tv_sec = YAR_G(timeout);
-			tv.tv_usec = 0;
+			tv.tv_sec = (ulong)(YAR_G(timeout) / 1000);
+			tv.tv_usec = (ulong)((YAR_G(timeout) % 1000)? (YAR_G(timeout) & 1000) * 1000 : 0);
 
 			FD_ZERO(&readfds);
 			FD_ZERO(&writefds);
 			FD_ZERO(&exceptfds);
 
 			curl_multi_fdset(multi->cm, &readfds, &writefds, &exceptfds, &max_fd);
+			if (max_fd == -1) {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "can not get fd from curl instance");
+				goto onerror;
+			}
 
 			return_code = select(max_fd + 1, &readfds, &writefds, &exceptfds, &tv);
 			if (return_code > 0) {
@@ -722,7 +724,7 @@ int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurren
 				goto onerror;
 			} else {
 				/* timeout */
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "select timeout '%d' seconds reached", YAR_G(timeout));
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "select timeout %ldms reached", YAR_G(timeout));
 				goto onerror;
 			}
 #endif
