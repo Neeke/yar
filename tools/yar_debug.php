@@ -1,3 +1,4 @@
+<?php
 /*
   +----------------------------------------------------------------------+
   | Yar - Light, concurrent RPC framework                                |
@@ -12,36 +13,25 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author:  Xinchen Hui   <laruence@php.net>                            |
-  |          Zhenyu  Zhang <zhangzhenyu@php.net>                         |
+  | Author:  Xinchen Hui <laruence@php.net>                              |
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
 
-#ifndef PHP_YAR_CLIENT_H
-#define PHP_YAR_CLIENT_H
+if (php_sapi_name() !== "cli") {
+    die ("This tool only run on CLI\n");
+}
 
-#define YAR_CLIENT_PROTOCOL_HTTP  1
-#define YAR_CLIENT_PROTOCOL_TCP   2
-#define YAR_CLIENT_PROTOCOL_UDP   3
-#define YAR_CLIENT_PROTOCOL_UNIX  4
+if ($argc < 4) {
+    die ("Usage: php debug.php uri method \"args, args\"\n");
+}
 
-#ifndef ZEND_FETCH_RESOURCE_NO_RETURN
-#define ZEND_FETCH_RESOURCE_NO_RETURN(rsrc, rsrc_type, passed_id, default_id, resource_type_name, resource_type)    \
-	    (rsrc = (rsrc_type) zend_fetch_resource(passed_id TSRMLS_CC, default_id, resource_type_name, NULL, 1, resource_type))
-#endif
+include "yar_debug.inc";
 
-YAR_STARTUP_FUNCTION(client);
-YAR_SHUTDOWN_FUNCTION(client);
+list($script, $uri, $method, $args) = $argv;
 
-#endif	/* PHP_YAR_CLIENT_H */
+$client = new Yar_Debug_Client($uri);
+$response = $client->call($method, explode(",", $args));
 
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */
+print_r($response);
+?>

@@ -510,10 +510,11 @@ PHP_METHOD(yar_client, __construct) {
 
     zend_update_property_stringl(yar_client_ce, getThis(), ZEND_STRL("_uri"), url, len TSRMLS_CC);
 
-	if (strncasecmp(url, ZEND_STRL("http://")) == 0 || strncasecmp(url, ZEND_STRL("https://")) == 0) {
-	} else if (strncasecmp(url, ZEND_STRL("tcp://")) == 0) {
+	if (strncasecmp(url, "http://", sizeof("http://") - 1) == 0
+			|| strncasecmp(url, "https://", sizeof("https://") - 1) == 0) {
+	} else if (strncasecmp(url, "tcp://", sizeof("tcp://") - 1) == 0) {
 		zend_update_property_long(yar_client_ce, getThis(), ZEND_STRL("_protocol"), YAR_CLIENT_PROTOCOL_TCP TSRMLS_CC);
-	} else if (strncasecmp(url, ZEND_STRL("unix://")) == 0) {
+	} else if (strncasecmp(url, "unix://", sizeof("unix://") - 1) == 0) {
 		zend_update_property_long(yar_client_ce, getThis(), ZEND_STRL("_protocol"), YAR_CLIENT_PROTOCOL_UNIX TSRMLS_CC);
 	} else {
 		php_yar_client_trigger_error(1 TSRMLS_CC, YAR_ERR_PROTOCOL, "unsupported protocol address %s", url);
@@ -615,7 +616,8 @@ PHP_METHOD(yar_concurrent_client, call) {
 		return;
 	}
 
-	if (strncasecmp(uri, ZEND_STRL("http://")) && strncasecmp(uri, ZEND_STRL("https://"))) {
+	if (strncasecmp(uri, "http://", sizeof("http://") - 1) 
+			&& strncasecmp(uri, "https://", sizeof("https://") - 1)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "only http protocol is supported in concurrent client for now");
 		return;
 	}
@@ -707,6 +709,20 @@ PHP_METHOD(yar_concurrent_client, call) {
 }
 /* }}} */
 
+/* {{{ proto Yar_Concurrent_Client::reset(void) */
+PHP_METHOD(yar_concurrent_client, reset) {
+	zval *callstack;
+
+
+	callstack = zend_read_static_property(yar_concurrent_client_ce, ZEND_STRL("_callstack"), 0 TSRMLS_CC);
+	if (ZVAL_IS_NULL(callstack) || zend_hash_num_elements(Z_ARRVAL_P(callstack)) == 0) {
+		RETURN_TRUE;
+	}
+	zend_hash_clean(Z_ARRVAL_P(callstack));
+	RETURN_TRUE;
+}
+/* }}} */
+
 /* {{{ proto Yar_Concurrent_Client::loop($callback = NULL, $error_callback) */
 PHP_METHOD(yar_concurrent_client, loop) {
 	char *name = NULL;
@@ -790,6 +806,7 @@ zend_function_entry yar_client_methods[] = {
 zend_function_entry yar_concurrent_client_methods[] = {
 	PHP_ME(yar_concurrent_client, call, arginfo_client_async, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	PHP_ME(yar_concurrent_client, loop, arginfo_client_loop, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	PHP_ME(yar_concurrent_client, reset, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	PHP_FE_END
 };
 /* }}} */
